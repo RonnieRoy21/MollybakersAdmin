@@ -13,17 +13,30 @@ import type { Session } from "@supabase/supabase-js";
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
-    void getAdminSession().then((adminSession) => {
-      setSession(adminSession);
-      setIsLoading(false);
-    });
+    void getAdminSession()
+      .then((adminSession) => {
+        setSession(adminSession);
+      })
+      .catch((error: unknown) => {
+        setAuthError(
+          error instanceof Error
+            ? error.message
+            : "Unable to verify administrator access. Check the API URL and CORS settings.",
+        );
+      })
+      .finally(() => setIsLoading(false));
 
     return undefined;
   }, []);
 
   if (isLoading) return null;
+
+  if (authError) {
+    return <AdminLoginPage initialError={authError} />;
+  }
 
   if (!session) return <AdminLoginPage />;
 

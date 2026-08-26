@@ -23,20 +23,24 @@ export async function getAdminSession(): Promise<Session | null> {
     });
     if (response.ok) return { access_token: token } as Session;
     localStorage.removeItem(TOKEN_KEY);
+    if (response.status === 403) {
+      throw new Error("This account does not have administrator access.");
+    }
   }
 
   const { data } = await supabase.auth.getSession();
   const session = data.session;
   if (!session) return null;
 
-  const { data: customer, error } = await supabase
-    .from("customers")
-    .select("role")
-    .eq("customer_id", session.user.id)
-    .single();
+  const response = await fetch(`${API_URL}/admin/session`, {
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  });
 
-  if (error || customer?.role !== "admin") {
+  if (!response.ok) {
     await supabase.auth.signOut();
+    if (response.status === 403) {
+      throw new Error("This account does not have administrator access.");
+    }
     return null;
   }
 

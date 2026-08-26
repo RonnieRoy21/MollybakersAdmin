@@ -14,11 +14,17 @@ import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { signInAdmin, signInWithGoogleAdmin } from "../auth";
 
-export default function AdminLoginPage() {
+interface AdminLoginPageProps {
+  initialError?: string | null;
+}
+
+export default function AdminLoginPage({
+  initialError = null,
+}: AdminLoginPageProps) {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleGoogleSignIn = async () => {
