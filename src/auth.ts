@@ -66,12 +66,15 @@ export async function signInAdmin(email: string, password: string) {
 }
 
 export async function signInWithGoogleAdmin() {
-  const { error } = await supabase.auth.signInWithOAuth({
+  const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: { redirectTo: window.location.origin },
   });
 
   if (error) throw new Error(error.message);
+  if (!data.url) throw new Error("Google sign-in URL was not returned.");
+
+  window.location.assign(data.url);
 }
 
 export async function signOutAdmin() {
