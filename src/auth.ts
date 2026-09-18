@@ -65,18 +65,6 @@ export async function signInAdmin(email: string, password: string) {
   localStorage.setItem(TOKEN_KEY, payload.response.access_token);
 }
 
-export async function signInWithGoogleAdmin() {
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo: window.location.origin },
-  });
-
-  if (error) throw new Error(error.message);
-  if (!data.url) throw new Error("Google sign-in URL was not returned.");
-
-  window.location.assign(data.url);
-}
-
 export async function signOutAdmin() {
   localStorage.removeItem(TOKEN_KEY);
 }

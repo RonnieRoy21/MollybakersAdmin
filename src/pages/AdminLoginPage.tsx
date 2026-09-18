@@ -1,5 +1,4 @@
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
-import GoogleIcon from "@mui/icons-material/Google";
 import {
   Alert,
   Avatar,
@@ -12,7 +11,7 @@ import {
 } from "@mui/material";
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { signInAdmin, signInWithGoogleAdmin } from "../auth";
+import { signInAdmin } from "../auth";
 
 interface AdminLoginPageProps {
   initialError?: string | null;
@@ -26,20 +25,6 @@ export default function AdminLoginPage({
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(initialError);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const handleGoogleSignIn = async () => {
-    setError(null);
-    setIsSubmitting(true);
-
-    try {
-      await signInWithGoogleAdmin();
-    } catch (loginError) {
-      setError(
-        loginError instanceof Error ? loginError.message : "Unable to sign in.",
-      );
-      setIsSubmitting(false);
-    }
-  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -114,16 +99,6 @@ export default function AdminLoginPage({
             disabled={isSubmitting}
           >
             {isSubmitting ? "Signing in..." : "Sign in"}
-          </Button>
-          <Button
-            type="button"
-            variant="outlined"
-            size="large"
-            startIcon={<GoogleIcon />}
-            onClick={() => void handleGoogleSignIn()}
-            disabled={isSubmitting}
-          >
-            Continue with Google
           </Button>
         </Stack>
       </Paper>

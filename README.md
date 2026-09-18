@@ -43,10 +43,6 @@ The admin user must already exist in Supabase Auth and have a matching row in
 `customers` with `role` set to `admin`. The backend validates both the access
 token and this role before serving admin endpoints.
 
-Google admin sign-in must be started from the admin deployment URL. Configure
-that URL as a Supabase redirect URL; the client app's Google button redirects
-back to the client app by design.
-
 Configured endpoints include:
 
 - `GET /allCakes`
