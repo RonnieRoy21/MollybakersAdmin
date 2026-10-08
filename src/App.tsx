@@ -1,3 +1,4 @@
+import { Box, CircularProgress } from "@mui/material";
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import CakesPage from "./pages/CakesPage";
@@ -32,13 +33,23 @@ export default function App() {
     return undefined;
   }, []);
 
-  if (isLoading) return null;
-
-  if (authError) {
-    return <AdminLoginPage initialError={authError} />;
+  if (isLoading) {
+    return (
+      <Box
+        role="status"
+        aria-label="Checking administrator session"
+        sx={{ minHeight: "100vh", display: "grid", placeItems: "center" }}
+      >
+        <CircularProgress />
+      </Box>
+    );
   }
 
-  if (!session) return <AdminLoginPage />;
+  if (authError) {
+    return <AdminLoginPage initialError={authError} onSignedIn={setSession} />;
+  }
+
+  if (!session) return <AdminLoginPage onSignedIn={setSession} />;
 
   return (
     <Layout>

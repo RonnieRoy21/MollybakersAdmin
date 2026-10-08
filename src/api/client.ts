@@ -28,7 +28,7 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const authorization = getAccessToken();
+  const authorization = await getAccessToken();
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
@@ -52,8 +52,15 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     return undefined as T;
   }
 
-  const payload = (await response.json()) as ApiResponse<T>;
-  return payload.response;
+  const payload = (await response.json()) as ApiResponse<T> | T;
+  if (
+    payload !== null &&
+    typeof payload === "object" &&
+    "response" in payload
+  ) {
+    return (payload as ApiResponse<T>).response;
+  }
+  return payload as T;
 }
 
 const json = (method: string, body?: unknown): RequestInit => ({
@@ -63,11 +70,24 @@ const json = (method: string, body?: unknown): RequestInit => ({
 
 export const api = {
   users: {
-    list: () => request<User[]>("/users"),
+    list: async () => {
+      const payload = await request<unknown>("/admin/getUsers");
+      if (Array.isArray(payload)) return payload as User[];
+      if (payload && typeof payload === "object") {
+        const users =
+          (payload as { users?: unknown; data?: unknown }).users ??
+          (payload as { data?: unknown }).data;
+        if (Array.isArray(users)) return users as User[];
+      }
+      throw new ApiError("Unexpected response while loading users.", 200);
+    },
     create: (user: NewUser) => request<User>("/users", json("POST", user)),
     update: (id: string, user: Partial<NewUser>) =>
       request<User>(`/users/${id}`, json("PATCH", user)),
-    remove: (id: string) => request<void>(`/users/${id}`, json("DELETE")),
+    remove: (email: string) =>
+      request<void>(`/admin/deleteUser/${encodeURIComponent(email)}`, {
+        method: "DELETE",
+      }),
   },
   cakes: {
     list: () => request<Cake[]>("/allCakes"),

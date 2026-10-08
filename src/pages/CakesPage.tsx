@@ -5,15 +5,14 @@ import LocalOfferOutlinedIcon from "@mui/icons-material/LocalOfferOutlined";
 import {
   Box,
   Button,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   IconButton,
   InputAdornment,
-  Alert,
   Paper,
-  Snackbar,
   Stack,
   Switch,
   Table,
@@ -28,7 +27,8 @@ import {
 import { useState } from "react";
 import { useEffect } from "react";
 import { api } from "../api/client";
-import type { Cake, NewCake, NewSpecialOffer } from "../types";
+import { useToast } from "../components/ToastProvider";
+import type { Cake, CakeOffer, NewCake, NewSpecialOffer } from "../types";
 
 // UI shell only — no data fetching here. Populate `cakes` yourself and
 // wire the handlers below to your real create/update/delete/offer calls.
@@ -59,24 +59,40 @@ const emptyOfferForm = (cake: Cake): NewSpecialOffer => ({
 });
 
 export default function CakesPage() {
+  const notify = useToast();
   const [cakes, setCakes] = useState<Cake[]>([]);
+  const [offers, setOffers] = useState<CakeOffer[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Cake | null>(null);
   const [form, setForm] = useState<CakeForm>(emptyForm);
 
   const [offerDialogOpen, setOfferDialogOpen] = useState(false);
   const [offerForm, setOfferForm] = useState<NewSpecialOffer | null>(null);
-  const [toast, setToast] = useState<{
-    message: string;
-    severity: "success" | "error";
-  } | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     void api.cakes.list().then(setCakes);
+    void api.offers
+      .list()
+      .then(setOffers)
+      .catch(() => notify("Unable to load active offers.", "error"));
   }, []);
+
+  const activeOfferCakeIds = new Set(
+    offers
+      .filter((offer) => {
+        const expiryTime = new Date(offer.expiry_date).getTime();
+        return Number.isFinite(expiryTime) && expiryTime >= Date.now();
+      })
+      .map((offer) => offer.cake_id),
+  );
 
   const refreshCakes = async () => {
     setCakes(await api.cakes.list());
+  };
+
+  const refreshOffers = async () => {
+    setOffers(await api.offers.list());
   };
 
   const openCreate = () => {
@@ -99,6 +115,8 @@ export default function CakesPage() {
   };
 
   const handleSave = async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
     try {
       if (editing) {
         const { cake_image, ...cakeChanges } = form;
@@ -107,32 +125,38 @@ export default function CakesPage() {
           cakeChanges,
         );
         await refreshCakes();
-        setToast({ message: response, severity: "success" });
+        notify(response || "Cake updated successfully.");
       } else if (form.cake_image) {
         const { cake_image, ...cake } = form;
         await api.cakes.create(cake, cake_image);
         await refreshCakes();
-        setToast({ message: "Cake Added Successfully", severity: "success" });
+        notify("Cake added successfully.");
       }
       setDialogOpen(false);
     } catch (error) {
-      setToast({
-        message: error instanceof Error ? error.message : "Request failed",
-        severity: "error",
-      });
+      notify(
+        error instanceof Error ? error.message : "Request failed.",
+        "error",
+      );
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const handleDelete = async (cake: Cake) => {
+    if (isProcessing) return;
+    setIsProcessing(true);
     try {
       const response = await api.cakes.remove(String(cake.cake_id));
       await refreshCakes();
-      setToast({ message: response, severity: "success" });
+      notify(response || "Cake deleted successfully.");
     } catch (error) {
-      setToast({
-        message: error instanceof Error ? error.message : "Request failed",
-        severity: "error",
-      });
+      notify(
+        error instanceof Error ? error.message : "Request failed.",
+        "error",
+      );
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -142,26 +166,30 @@ export default function CakesPage() {
   };
 
   const handleSaveOffer = async () => {
-    if (!offerForm) return;
+    if (!offerForm || isProcessing) return;
+    setIsProcessing(true);
     try {
       const response = await api.offers.create(offerForm);
-      await refreshCakes();
-      setToast({ message: response, severity: "success" });
+      await Promise.all([refreshCakes(), refreshOffers()]);
+      notify(response || "Offer created successfully.");
       setOfferDialogOpen(false);
     } catch (error) {
-      setToast({
-        message: error instanceof Error ? error.message : "Request failed",
-        severity: "error",
-      });
+      notify(
+        error instanceof Error ? error.message : "Request failed.",
+        "error",
+      );
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   return (
     <Box>
       <Stack
-        direction="row"
+        direction={{ xs: "column", sm: "row" }}
         justifyContent="space-between"
-        alignItems="center"
+        alignItems={{ xs: "stretch", sm: "center" }}
+        spacing={2}
         mb={3}
       >
         <Box>
@@ -174,6 +202,8 @@ export default function CakesPage() {
           variant="contained"
           startIcon={<AddIcon />}
           onClick={openCreate}
+          disabled={isProcessing}
+          sx={{ width: { xs: "100%", sm: "auto" } }}
         >
           Add cake
         </Button>
@@ -181,7 +211,7 @@ export default function CakesPage() {
 
       <Paper variant="outlined">
         <TableContainer>
-          <Table>
+          <Table sx={{ minWidth: 900 }}>
             <TableHead>
               <TableRow>
                 <TableCell>Name</TableCell>
@@ -205,7 +235,24 @@ export default function CakesPage() {
               ) : (
                 cakes.map((c) => (
                   <TableRow key={c.cake_id} hover>
-                    <TableCell>{c.cake_name}</TableCell>
+                    <TableCell>
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        spacing={1}
+                        useFlexGap
+                        flexWrap="wrap"
+                      >
+                        <Typography fontWeight={600}>{c.cake_name}</Typography>
+                        {activeOfferCakeIds.has(c.cake_id) && (
+                          <Chip
+                            size="small"
+                            color="secondary"
+                            label="Offer active"
+                          />
+                        )}
+                      </Stack>
+                    </TableCell>
                     <TableCell sx={{ maxWidth: 320 }}>
                       <Typography variant="body2" color="text.secondary" noWrap>
                         {c.cake_description || "—"}
@@ -233,6 +280,7 @@ export default function CakesPage() {
                       <IconButton
                         size="small"
                         onClick={() => openOffer(c)}
+                        disabled={isProcessing}
                         title="Create special offer"
                       >
                         <LocalOfferOutlinedIcon fontSize="small" />
@@ -240,6 +288,7 @@ export default function CakesPage() {
                       <IconButton
                         size="small"
                         onClick={() => openEdit(c)}
+                        disabled={isProcessing}
                         title="Edit"
                       >
                         <EditOutlinedIcon fontSize="small" />
@@ -247,6 +296,7 @@ export default function CakesPage() {
                       <IconButton
                         size="small"
                         onClick={() => handleDelete(c)}
+                        disabled={isProcessing}
                         title="Delete"
                       >
                         <DeleteOutlineIcon fontSize="small" />
@@ -340,13 +390,17 @@ export default function CakesPage() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setDialogOpen(false)} disabled={isProcessing}>
+            Cancel
+          </Button>
           <Button
             variant="contained"
             onClick={handleSave}
-            disabled={!form.cake_name || (!editing && !form.cake_image)}
+            disabled={
+              isProcessing || !form.cake_name || (!editing && !form.cake_image)
+            }
           >
-            Save
+            {isProcessing ? "Saving..." : "Save"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -443,28 +497,21 @@ export default function CakesPage() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOfferDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSaveOffer}>
-            Create offer
+          <Button
+            onClick={() => setOfferDialogOpen(false)}
+            disabled={isProcessing}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSaveOffer}
+            disabled={isProcessing}
+          >
+            {isProcessing ? "Creating..." : "Create offer"}
           </Button>
         </DialogActions>
       </Dialog>
-
-      <Snackbar
-        open={toast !== null}
-        autoHideDuration={5000}
-        onClose={() => setToast(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-      >
-        <Alert
-          onClose={() => setToast(null)}
-          severity={toast?.severity ?? "success"}
-          variant="filled"
-          sx={{ width: "100%" }}
-        >
-          {toast?.message}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 }

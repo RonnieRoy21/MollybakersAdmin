@@ -14,9 +14,11 @@ import {
 } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
+import { useToast } from "../components/ToastProvider";
 import type { Feedback } from "../types";
 
 export default function FeedbackPage() {
+  const notify = useToast();
   const [items, setItems] = useState<Feedback[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -59,8 +61,14 @@ export default function FeedbackPage() {
         ),
       );
       setReplyTarget(null);
-    } catch {
-      setError("Unable to save the response. Please try again.");
+      notify("Response sent successfully.");
+    } catch (error) {
+      notify(
+        error instanceof Error
+          ? error.message
+          : "Unable to save the response. Please try again.",
+        "error",
+      );
     } finally {
       setSaving(false);
     }
@@ -98,20 +106,29 @@ export default function FeedbackPage() {
             <Card key={item.reviewId} variant="outlined">
               <CardContent>
                 <Stack
-                  direction="row"
+                  direction={{ xs: "column", sm: "row" }}
                   justifyContent="space-between"
-                  alignItems="flex-start"
+                  alignItems={{ xs: "stretch", sm: "flex-start" }}
+                  spacing={0.5}
                   mb={1}
                 >
                   <Typography fontWeight={600}>
                     Review #{item.reviewId}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ overflowWrap: "anywhere" }}
+                  >
                     {new Date(item.created_at).toLocaleString()}
                   </Typography>
                 </Stack>
 
-                <Typography variant="body1" mt={1}>
+                <Typography
+                  variant="body1"
+                  mt={1}
+                  sx={{ overflowWrap: "anywhere" }}
+                >
                   {item.review_content}
                 </Typography>
 
@@ -165,7 +182,9 @@ export default function FeedbackPage() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setReplyTarget(null)}>Cancel</Button>
+          <Button onClick={() => setReplyTarget(null)} disabled={saving}>
+            Cancel
+          </Button>
           <Button
             variant="contained"
             onClick={sendReply}

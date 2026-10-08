@@ -3,11 +3,10 @@
 // on a typical auth users table + a cakes table.
 
 export interface User {
-  id: string;
   email: string;
-  full_name?: string;
-  created_at: string;
-  is_active?: boolean;
+  phone_number: string;
+  role: string;
+  location: string;
 }
 
 export interface Cake {
@@ -20,7 +19,7 @@ export interface Cake {
   cake_url: string;
 }
 
-export type NewUser = Omit<User, "id" | "created_at">;
+export type NewUser = User;
 export type NewCake = Omit<Cake, "cake_id" | "cake_url">;
 
 export interface CakeOffer {

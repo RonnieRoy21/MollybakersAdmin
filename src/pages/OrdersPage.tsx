@@ -71,9 +71,10 @@ export default function OrdersPage() {
   return (
     <Box>
       <Stack
-        direction="row"
+        direction={{ xs: "column", sm: "row" }}
         justifyContent="space-between"
-        alignItems="center"
+        alignItems={{ xs: "stretch", sm: "center" }}
+        spacing={2}
         mb={3}
       >
         <Box>
@@ -102,6 +103,7 @@ export default function OrdersPage() {
             <IconButton
               size="small"
               onClick={() => void loadOrders()}
+              disabled={loading}
               aria-label="Retry loading orders"
             >
               <RefreshOutlinedIcon fontSize="small" />
@@ -115,7 +117,7 @@ export default function OrdersPage() {
 
       <Paper variant="outlined">
         <TableContainer>
-          <Table>
+          <Table sx={{ minWidth: 850 }}>
             <TableHead>
               <TableRow>
                 <TableCell>Order</TableCell>

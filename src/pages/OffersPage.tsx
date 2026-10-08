@@ -38,7 +38,7 @@ export default function OffersPage() {
 
       <Paper variant="outlined">
         <TableContainer>
-          <Table>
+          <Table sx={{ minWidth: 680 }}>
             <TableHead>
               <TableRow>
                 <TableCell>Cake</TableCell>

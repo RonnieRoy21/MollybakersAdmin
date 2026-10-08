@@ -4,15 +4,14 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import {
   Box,
   Button,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  Alert,
   IconButton,
   Paper,
   Stack,
-  Switch,
   Table,
   TableBody,
   TableCell,
@@ -22,20 +21,35 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { api } from "../api/client";
+import { useToast } from "../components/ToastProvider";
 import type { NewUser, User } from "../types";
 
-// UI shell only — no data fetching here. Populate `users` yourself
-// (via useEffect + your own API client, React Query, etc.) and wire
-// the handlers below to your real create/update/delete calls.
-
-const emptyForm: NewUser = { email: "", full_name: "", is_active: true };
+const emptyForm: NewUser = {
+  email: "",
+  phone_number: "",
+  role: "",
+  location: "",
+};
 
 export default function UsersPage() {
-  const [users] = useState<User[]>([]);
+  const notify = useToast();
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deletingEmail, setDeletingEmail] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
   const [form, setForm] = useState<NewUser>(emptyForm);
+
+  useEffect(() => {
+    api.users
+      .list()
+      .then(setUsers)
+      .catch(() => setError("Unable to load users. Please try again."))
+      .finally(() => setLoading(false));
+  }, []);
 
   const openCreate = () => {
     setEditing(null);
@@ -47,8 +61,9 @@ export default function UsersPage() {
     setEditing(user);
     setForm({
       email: user.email,
-      full_name: user.full_name,
-      is_active: user.is_active,
+      phone_number: user.phone_number,
+      role: user.role,
+      location: user.location,
     });
     setDialogOpen(true);
   };
@@ -58,17 +73,34 @@ export default function UsersPage() {
     setDialogOpen(false);
   };
 
-  const handleDelete = (user: User) => {
-    // TODO: call your API here, then update state (or just refetch).
-    void user;
+  const handleDelete = async (user: User) => {
+    if (deletingEmail) return;
+    setDeletingEmail(user.email);
+    setError(null);
+    try {
+      await api.users.remove(user.email);
+      setUsers((currentUsers) =>
+        currentUsers.filter((currentUser) => currentUser.email !== user.email),
+      );
+      notify("User deleted successfully.");
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Unable to delete user. Please try again.",
+      );
+    } finally {
+      setDeletingEmail(null);
+    }
   };
 
   return (
     <Box>
       <Stack
-        direction="row"
+        direction={{ xs: "column", sm: "row" }}
         justifyContent="space-between"
-        alignItems="center"
+        alignItems={{ xs: "stretch", sm: "center" }}
+        spacing={2}
         mb={3}
       >
         <Box>
@@ -81,25 +113,40 @@ export default function UsersPage() {
           variant="contained"
           startIcon={<AddIcon />}
           onClick={openCreate}
+          sx={{ width: { xs: "100%", sm: "auto" } }}
         >
           Add user
         </Button>
       </Stack>
 
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
       <Paper variant="outlined">
         <TableContainer>
-          <Table>
+          <Table sx={{ minWidth: 680 }}>
             <TableHead>
               <TableRow>
                 <TableCell>Email</TableCell>
-                <TableCell>Name</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Joined</TableCell>
+                <TableCell>Phone number</TableCell>
+                <TableCell>Role</TableCell>
+                <TableCell>Location</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {users.length === 0 ? (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
+                    <Typography color="text.secondary">
+                      Loading users...
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : users.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
                     <Typography color="text.secondary">
@@ -109,25 +156,21 @@ export default function UsersPage() {
                 </TableRow>
               ) : (
                 users.map((u) => (
-                  <TableRow key={u.id} hover>
+                  <TableRow key={u.email} hover>
                     <TableCell>{u.email}</TableCell>
-                    <TableCell>{u.full_name || "—"}</TableCell>
-                    <TableCell>
-                      <Chip
-                        size="small"
-                        label={u.is_active === false ? "Inactive" : "Active"}
-                        color={u.is_active === false ? "default" : "success"}
-                        variant="outlined"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {new Date(u.created_at).toLocaleDateString()}
-                    </TableCell>
+                    <TableCell>{u.phone_number || "—"}</TableCell>
+                    <TableCell>{u.role || "—"}</TableCell>
+                    <TableCell>{u.location || "—"}</TableCell>
                     <TableCell align="right">
                       <IconButton size="small" onClick={() => openEdit(u)}>
                         <EditOutlinedIcon fontSize="small" />
                       </IconButton>
-                      <IconButton size="small" onClick={() => handleDelete(u)}>
+                      <IconButton
+                        size="small"
+                        onClick={() => void handleDelete(u)}
+                        disabled={deletingEmail !== null}
+                        aria-label={`Delete ${u.email}`}
+                      >
                         <DeleteOutlineIcon fontSize="small" />
                       </IconButton>
                     </TableCell>
@@ -157,20 +200,25 @@ export default function UsersPage() {
               required
             />
             <TextField
-              label="Full name"
-              value={form.full_name ?? ""}
-              onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+              label="Phone number"
+              value={form.phone_number}
+              onChange={(e) =>
+                setForm({ ...form, phone_number: e.target.value })
+              }
               fullWidth
             />
-            <Stack direction="row" alignItems="center" spacing={1}>
-              <Switch
-                checked={form.is_active ?? true}
-                onChange={(e) =>
-                  setForm({ ...form, is_active: e.target.checked })
-                }
-              />
-              <Typography variant="body2">Active</Typography>
-            </Stack>
+            <TextField
+              label="Role"
+              value={form.role}
+              onChange={(e) => setForm({ ...form, role: e.target.value })}
+              fullWidth
+            />
+            <TextField
+              label="Location"
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
+              fullWidth
+            />
           </Stack>
         </DialogContent>
         <DialogActions>

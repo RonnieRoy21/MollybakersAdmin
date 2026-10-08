@@ -11,16 +11,21 @@ import {
 } from "@mui/material";
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import type { Session } from "@supabase/supabase-js";
 import { signInAdmin } from "../auth";
+import { useToast } from "../components/ToastProvider";
 
 interface AdminLoginPageProps {
   initialError?: string | null;
+  onSignedIn: (session: Session) => void;
 }
 
 export default function AdminLoginPage({
   initialError = null,
+  onSignedIn,
 }: AdminLoginPageProps) {
   const navigate = useNavigate();
+  const notify = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(initialError);
@@ -32,7 +37,9 @@ export default function AdminLoginPage({
     setIsSubmitting(true);
 
     try {
-      await signInAdmin(email.trim(), password);
+      const session = await signInAdmin(email.trim(), password);
+      onSignedIn(session);
+      notify("Signed in successfully.");
       navigate("/users", { replace: true });
     } catch (loginError) {
       setError(
@@ -56,7 +63,7 @@ export default function AdminLoginPage({
       <Paper
         component="form"
         onSubmit={handleSubmit}
-        sx={{ width: "100%", maxWidth: 420, p: 4 }}
+        sx={{ width: "100%", maxWidth: 420, p: { xs: 2.5, sm: 4 } }}
       >
         <Stack spacing={3}>
           <Stack spacing={1} alignItems="center">
